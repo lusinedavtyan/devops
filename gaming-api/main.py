@@ -1,9 +1,23 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
 from dotenv import load_dotenv
 import os
 import requests
 
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from pydantic import BaseModel
+
 load_dotenv()
+
+DATABASE_URL = "sqlite:///./test.db"
+
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 # get configs from .env file
 API_KEY = os.getenv("API_KEY")
@@ -12,15 +26,54 @@ APP_ENV = os.getenv("APP_ENV")
 # create FastAPI application
 app = FastAPI()
 
-# configs endpoint
+
+# -----------------------------
+# Database model
+# -----------------------------
+class Deal(Base):
+    __tablename__ = "deals"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    sale_price = Column(String)
+    discount = Column(String)
+
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+
+# -----------------------------
+# Pydantic schema
+# -----------------------------
+class DealCreate(BaseModel):
+    title: str
+    sale_price: str
+    discount: str
+
+
+# -----------------------------
+# DB dependency
+# -----------------------------
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# -----------------------------
+# Existing endpoints
+# -----------------------------
 @app.get("/configs")
-def getConfigs():
+def get_configs():
     return {
         "api_key": API_KEY,
         "app_env": APP_ENV
     }
 
-# health endpoint
+
 @app.get("/health")
 def health():
     return {
@@ -28,27 +81,22 @@ def health():
         "version": "1.0.0"
     }
 
-# deals endpoint
+
 @app.get("/deals")
 def get_deals():
     url = "https://www.cheapshark.com/api/1.0/deals"
-
-    # get cheapshark deals API
     response = requests.get(url)
 
-    # verify if status code not 200 OK and raise the script with failed massege
     if response.status_code != 200:
         raise HTTPException(
             status_code=response.status_code,
             detail="External API request failed"
         )
 
-    # keep request's response in json format
     data = response.json()
     deals = []
 
-    # go through data to take title, noral_price and sale_price properties and create custom response
-    for game in data:
+    for game in data[:10]:
         title = game["title"]
         normal_price = game["normalPrice"]
         sale_price = game["salePrice"]
@@ -62,3 +110,46 @@ def get_deals():
         })
 
     return {"games": deals}
+
+
+# -----------------------------
+# CRUD endpoints
+# -----------------------------
+@app.post("/saved-deals")
+def create_deal(deal: DealCreate, db: Session = Depends(get_db)):
+    new_deal = Deal(
+        title=deal.title,
+        sale_price=deal.sale_price,
+        discount=deal.discount
+    )
+
+    db.add(new_deal)
+    db.commit()
+    db.refresh(new_deal)
+
+    return {
+        "message": "Deal saved successfully",
+        "deal": {
+            "id": new_deal.id,
+            "title": new_deal.title,
+            "sale_price": new_deal.sale_price,
+            "discount": new_deal.discount
+        }
+    }
+
+
+@app.get("/saved-deals")
+def get_saved_deals(db: Session = Depends(get_db)):
+    deals = db.query(Deal).all()
+
+    return {
+        "saved_deals": [
+            {
+                "id": deal.id,
+                "title": deal.title,
+                "sale_price": deal.sale_price,
+                "discount": deal.discount
+            }
+            for deal in deals
+        ]
+    }
