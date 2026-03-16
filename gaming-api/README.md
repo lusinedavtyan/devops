@@ -1,81 +1,97 @@
-# Game Deals API
+# Deals API (FastAPI + SQLite)
 
-## Description
+## Overview
 
-Game Deals API is a simple REST API built with FastAPI that fetches
-video game deals from the CheapShark public API and returns a customized
-list of deals.
+Deals API is a backend service built with FastAPI that fetches video
+game deals from the CheapShark public API and allows users to save
+selected deals into a local SQLite database.
 
-The API demonstrates how to: - Call an external API - Parse incoming
-JSON data - Extract specific fields from the response - Apply custom
-logic to the data - Return a clean JSON response
-
-This project simulates a small startup service that aggregates game
-discounts and exposes them through a simple API endpoint.
-
-## Features
-
--   Health check endpoint
--   Integration with the CheapShark Game Deals API
--   JSON parsing and data transformation
--   Custom API response format
-
-## Endpoints
-
-### Health Check
-
-GET /health
-
-Returns the service status.
-
-Example response:
-
-{ "status": "healthy", "version": "1.0.0" }
+The application demonstrates: - FastAPI REST API development -
+Environment configuration using `.env` - Database integration using
+SQLAlchemy - Request validation using Pydantic - CRUD endpoints (Create
+and Read) - External API integration
 
 ------------------------------------------------------------------------
-
-### Game Deals
-
-GET /deals
-
-Fetches game deals from the CheapShark API and returns a simplified list
-of deals.
-
-Example response:
-
-{ "games": \[ { "title": "New Batman Arkham Knight", "sale_price":
-"3.99", "discount": "19.99" } \] }
 
 ## Technologies Used
 
 -   Python
 -   FastAPI
--   Requests library
--   CheapShark Game Deals API
+-   SQLAlchemy
+-   SQLite
+-   Pydantic
+-   Requests
+-   python-dotenv
 
-## How to Run the Project
+------------------------------------------------------------------------
 
-1.  Clone the repository
+## Project Structure
 
-git clone `<repository-url>`{=html} cd `<repository-folder>`{=html}
+project/ │ ├── main.py ├── README.md ├── .gitignore ├── .env ├── test.db
+└── venv/
 
-2.  Install dependencies
+------------------------------------------------------------------------
 
-pip install fastapi uvicorn requests
+## Environment Variables
 
-3.  Run the API server
+Create a `.env` file:
+
+API_KEY=your_secret_key APP_ENV=development
+DATABASE_URL=sqlite:///./test.db
+
+------------------------------------------------------------------------
+
+## Running the Application
+
+Install dependencies:
+
+pip install fastapi uvicorn sqlalchemy python-dotenv requests
+
+Run the server:
 
 uvicorn main:app --reload
 
-4.  Open the API
+Open the API:
 
 http://127.0.0.1:8000
 
-Interactive API documentation:
+Swagger docs:
 
 http://127.0.0.1:8000/docs
 
-## Project Purpose
+------------------------------------------------------------------------
 
-This project demonstrates basic backend API development using FastAPI,
-including external API integration and JSON data processing.
+## API Endpoints
+
+GET /health\
+Returns service health status.
+
+GET /deals\
+Fetches game deals from CheapShark API.
+
+POST /saved-deals\
+Saves a deal into the database.
+
+GET /saved-deals\
+Returns all saved deals.
+
+------------------------------------------------------------------------
+
+## Database
+
+The application uses SQLite.\
+SQLAlchemy automatically creates a table named:
+
+deals
+
+Columns: - id - title - sale_price - discount
+
+Database file: test.db
+
+------------------------------------------------------------------------
+
+## Purpose
+
+This project demonstrates how to build a REST API with FastAPI,
+integrate a database, validate requests using Pydantic, and persist
+application data.
