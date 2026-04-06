@@ -1,0 +1,6 @@
+all:
+  children:
+    backend:
+      hosts:
+        genesis-backend:
+          ansible_connection: podman
