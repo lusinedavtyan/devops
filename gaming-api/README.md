@@ -1,81 +1,99 @@
-# Game Deals API
+## Ansible Integration
 
-## Description
+### Overview
+This project integrates Ansible to interact with the running backend container without using SSH.  
+It uses Ansible’s native container connection (`podman`) to execute commands directly inside the container.
 
-Game Deals API is a simple REST API built with FastAPI that fetches
-video game deals from the CheapShark public API and returns a customized
-list of deals.
+---
 
-The API demonstrates how to: - Call an external API - Parse incoming
-JSON data - Extract specific fields from the response - Apply custom
-logic to the data - Return a clean JSON response
+### Setup
 
-This project simulates a small startup service that aggregates game
-discounts and exposes them through a simple API endpoint.
+#### 1. Start the application
 
-## Features
+```bash
+podman compose up -d
+```
 
--   Health check endpoint
--   Integration with the CheapShark Game Deals API
--   JSON parsing and data transformation
--   Custom API response format
+Verify container is running:
 
-## Endpoints
+```bash
+podman ps
+```
 
-### Health Check
+---
 
-GET /health
+#### 2. Ansible Inventory
 
-Returns the service status.
+File: `inventory.yml`
 
-Example response:
+```yaml
+all:
+  children:
+    backend:
+      hosts:
+        genesis-backend:
+          ansible_connection: podman
+```
 
-{ "status": "healthy", "version": "1.0.0" }
+---
 
-------------------------------------------------------------------------
+#### 3. Ansible Configuration
 
-### Game Deals
+File: `ansible.cfg`
 
-GET /deals
+```ini
+[defaults]
+remote_tmp = /tmp/.ansible/tmp
+host_key_checking = False
+```
 
-Fetches game deals from the CheapShark API and returns a simplified list
-of deals.
+---
 
-Example response:
+#### 4. Execution Script
 
-{ "games": \[ { "title": "New Batman Arkham Knight", "sale_price":
-"3.99", "discount": "19.99" } \] }
+File: `ansible-ping.sh`
 
-## Technologies Used
+```bash
+#!/bin/bash
 
--   Python
--   FastAPI
--   Requests library
--   CheapShark Game Deals API
+echo "===== Backend container test ====="
+ansible backend -i inventory.yml -m raw -a "echo pong"
+```
 
-## How to Run the Project
+Make it executable:
 
-1.  Clone the repository
+```bash
+chmod +x ansible-ping.sh
+```
 
-git clone `<repository-url>`{=html} cd `<repository-folder>`{=html}
+---
 
-2.  Install dependencies
+### Run Test
 
-pip install fastapi uvicorn requests
+```bash
+./ansible-ping.sh
+```
 
-3.  Run the API server
+Expected output:
 
-uvicorn main:app --reload
+```bash
+genesis-backend | CHANGED | rc=0 >>
+pong
+```
 
-4.  Open the API
+---
 
-http://127.0.0.1:8000
+### Notes
 
-Interactive API documentation:
+- The project uses SQLite, which runs inside the backend container.
+- No separate database container is required.
+- Ansible connects directly to the container without SSH.
 
-http://127.0.0.1:8000/docs
+---
 
-## Project Purpose
+### Files Added
 
-This project demonstrates basic backend API development using FastAPI,
-including external API integration and JSON data processing.
+- inventory.yml
+- ansible.cfg
+- ansible-ping.sh
+- ansible-output.md
