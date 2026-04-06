@@ -1,97 +1,99 @@
-# Deals API (FastAPI + SQLite)
+## Ansible Integration
 
-## Overview
+### Overview
+This project integrates Ansible to interact with the running backend container without using SSH.  
+It uses Ansible’s native container connection (`podman`) to execute commands directly inside the container.
 
-Deals API is a backend service built with FastAPI that fetches video
-game deals from the CheapShark public API and allows users to save
-selected deals into a local SQLite database.
+---
 
-The application demonstrates: - FastAPI REST API development -
-Environment configuration using `.env` - Database integration using
-SQLAlchemy - Request validation using Pydantic - CRUD endpoints (Create
-and Read) - External API integration
+### Setup
 
-------------------------------------------------------------------------
+#### 1. Start the application
 
-## Technologies Used
+```bash
+podman compose up -d
+```
 
--   Python
--   FastAPI
--   SQLAlchemy
--   SQLite
--   Pydantic
--   Requests
--   python-dotenv
+Verify container is running:
 
-------------------------------------------------------------------------
+```bash
+podman ps
+```
 
-## Project Structure
+---
 
-project/ │ ├── main.py ├── README.md ├── .gitignore ├── .env ├── test.db
-└── venv/
+#### 2. Ansible Inventory
 
-------------------------------------------------------------------------
+File: `inventory.yml`
 
-## Environment Variables
+```yaml
+all:
+  children:
+    backend:
+      hosts:
+        genesis-backend:
+          ansible_connection: podman
+```
 
-Create a `.env` file:
+---
 
-API_KEY=your_secret_key APP_ENV=development
-DATABASE_URL=sqlite:///./test.db
+#### 3. Ansible Configuration
 
-------------------------------------------------------------------------
+File: `ansible.cfg`
 
-## Running the Application
+```ini
+[defaults]
+remote_tmp = /tmp/.ansible/tmp
+host_key_checking = False
+```
 
-Install dependencies:
+---
 
-pip install fastapi uvicorn sqlalchemy python-dotenv requests
+#### 4. Execution Script
 
-Run the server:
+File: `ansible-ping.sh`
 
-uvicorn main:app --reload
+```bash
+#!/bin/bash
 
-Open the API:
+echo "===== Backend container test ====="
+ansible backend -i inventory.yml -m raw -a "echo pong"
+```
 
-http://127.0.0.1:8000
+Make it executable:
 
-Swagger docs:
+```bash
+chmod +x ansible-ping.sh
+```
 
-http://127.0.0.1:8000/docs
+---
 
-------------------------------------------------------------------------
+### Run Test
 
-## API Endpoints
+```bash
+./ansible-ping.sh
+```
 
-GET /health\
-Returns service health status.
+Expected output:
 
-GET /deals\
-Fetches game deals from CheapShark API.
+```bash
+genesis-backend | CHANGED | rc=0 >>
+pong
+```
 
-POST /saved-deals\
-Saves a deal into the database.
+---
 
-GET /saved-deals\
-Returns all saved deals.
+### Notes
 
-------------------------------------------------------------------------
+- The project uses SQLite, which runs inside the backend container.
+- No separate database container is required.
+- Ansible connects directly to the container without SSH.
 
-## Database
+---
 
-The application uses SQLite.\
-SQLAlchemy automatically creates a table named:
+### Files Added
 
-deals
-
-Columns: - id - title - sale_price - discount
-
-Database file: test.db
-
-------------------------------------------------------------------------
-
-## Purpose
-
-This project demonstrates how to build a REST API with FastAPI,
-integrate a database, validate requests using Pydantic, and persist
-application data.
+- inventory.yml
+- ansible.cfg
+- ansible-ping.sh
+- ansible-output.md
