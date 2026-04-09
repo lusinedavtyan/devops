@@ -3,4 +3,10 @@ all:
     backend:
       hosts:
         genesis-backend:
-          ansible_connection: podman
+          ansible_connection: containers.podman.podman
+          ansible_python_interpreter: /usr/local/bin/python3.11
+
+    database:
+      hosts:
+        genesis-db:
+          ansible_connection: containers.podman.podman
