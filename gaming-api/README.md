@@ -1,30 +1,60 @@
-## Ansible Integration
+# 🚀 Ansible Integration with Podman & PostgreSQL
 
-### Overview
-This project integrates Ansible to interact with the running backend container without using SSH.  
-It uses Ansible’s native container connection (`podman`) to execute commands directly inside the container.
+## 📌 Overview
+This project demonstrates how to use **Ansible** to interact with running containers **without SSH**, using the **Podman connection plugin**.
+
+The system consists of:
+- 🟢 Backend container (FastAPI application)
+- 🟡 Database container (PostgreSQL)
+
+Ansible connects directly to both containers and executes commands inside them.
 
 ---
 
-### Setup
+## 🏗️ Architecture
 
-#### 1. Start the application
+- Backend → FastAPI + SQLAlchemy
+- Database → PostgreSQL (`postgres:15`)
+- Container runtime → Podman
+- Automation → Ansible (no SSH)
+
+---
+
+## ⚙️ Setup
+
+### 1. Start containers
 
 ```bash
 podman compose up -d
 ```
 
-Verify container is running:
+Check running containers:
 
 ```bash
-podman ps
+podman ps --format "table {{.Names}}\t{{.Image}}"
 ```
 
 ---
 
-#### 2. Ansible Inventory
+## 🗄️ PostgreSQL Configuration
 
-File: `inventory.yml`
+### `.env`
+
+```env
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@genesis-db:5432/postgres
+API_KEY=your_api_key
+APP_ENV=development
+```
+
+### Requirements
+
+```bash
+pip install psycopg2-binary
+```
+
+---
+
+## 📂 Ansible Inventory
 
 ```yaml
 all:
@@ -32,66 +62,57 @@ all:
     backend:
       hosts:
         genesis-backend:
-          ansible_connection: podman
+          ansible_connection: containers.podman.podman
+          ansible_python_interpreter: /usr/local/bin/python3.11
+
+    database:
+      hosts:
+        genesis-db:
+          ansible_connection: containers.podman.podman
 ```
 
 ---
 
-#### 3. Ansible Configuration
-
-File: `ansible.cfg`
-
-```ini
-[defaults]
-remote_tmp = /tmp/.ansible/tmp
-host_key_checking = False
-```
-
----
-
-#### 4. Execution Script
-
-File: `ansible-ping.sh`
+## ▶️ Execution Script
 
 ```bash
 #!/bin/bash
 
-echo "===== Backend container test ====="
-ansible backend -i inventory.yml -m raw -a "echo pong"
-```
+echo "=== Ping backend container ==="
+ansible -i inventory.yml backend -m ping
 
-Make it executable:
+echo ""
+echo "=== Check database container ==="
+ansible -i inventory.yml database -m raw -a "hostname"
 
-```bash
-chmod +x ansible-ping.sh
+echo ""
+echo "=== Check backend hostname ==="
+ansible -i inventory.yml backend -m command -a "hostname"
+
+echo ""
+echo "=== Check database hostname ==="
+ansible -i inventory.yml database -m raw -a "hostname"
 ```
 
 ---
 
-### Run Test
+## 🧪 Run Test
 
 ```bash
 ./ansible-ping.sh
 ```
 
-Expected output:
+---
 
-```bash
-genesis-backend | CHANGED | rc=0 >>
-pong
-```
+## 🧠 Notes
+
+- No SSH is used
+- Backend supports full Ansible modules
+- PostgreSQL container uses `raw` module only (no Python inside)
 
 ---
 
-### Notes
-
-- The project uses SQLite, which runs inside the backend container.
-- No separate database container is required.
-- Ansible connects directly to the container without SSH.
-
----
-
-### Files Added
+## 📦 Files
 
 - inventory.yml
 - ansible.cfg
