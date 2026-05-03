@@ -60,7 +60,18 @@ resource "aws_subnet" "public_subnet" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "genesis-public-subnet"
+    Name = "genesis-public-subnet-1"
+  }
+}
+
+resource "aws_subnet" "public_subnet_2" {
+  vpc_id                  = aws_vpc.genesis_vpc.id
+  cidr_block              = "10.0.4.0/24"
+  availability_zone       = "us-east-1b"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "genesis-public-subnet-2"
   }
 }
 
@@ -118,6 +129,11 @@ resource "aws_route_table_association" "public_assoc" {
   route_table_id = aws_route_table.public_rt.id
 }
 
+resource "aws_route_table_association" "public_assoc_2" {
+  subnet_id      = aws_subnet.public_subnet_2.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
 resource "aws_route_table_association" "private_assoc_1" {
   subnet_id      = aws_subnet.private_subnet.id
   route_table_id = aws_route_table.private_rt.id
@@ -141,23 +157,50 @@ resource "aws_db_subnet_group" "genesis_db_subnet_group" {
   }
 }
 
+resource "aws_security_group" "alb_sg" {
+  name   = "genesis-alb-sg"
+  vpc_id = aws_vpc.genesis_vpc.id
+
+  ingress {
+    description = "Allow HTTP from internet"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "Allow all outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "genesis-alb-sg"
+  }
+}
+
 resource "aws_security_group" "app_sg" {
   name   = "genesis-app-sg"
   vpc_id = aws_vpc.genesis_vpc.id
+
+  ingress {
+    description     = "Allow HTTP from ALB only"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
 
   ingress {
     description = "Allow SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
-  ingress {
-    description = "Allow HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
+    # For homework this is okay. In real projects, use your IP only.
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -179,7 +222,7 @@ resource "aws_security_group" "db_sg" {
   vpc_id = aws_vpc.genesis_vpc.id
 
   ingress {
-    description     = "Allow PostgreSQL from app server only"
+    description     = "Allow PostgreSQL from app servers only"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
@@ -219,17 +262,65 @@ resource "aws_db_instance" "genesis_db" {
   }
 }
 
-resource "aws_instance" "genesis_app" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = "t3.micro"
-  key_name                    = "lusine-server-pem"
-  subnet_id                   = aws_subnet.public_subnet.id
-  vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  associate_public_ip_address = true
+resource "aws_lb" "genesis_alb" {
+  name               = "genesis-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
 
-  user_data_replace_on_change = true
+  subnets = [
+    aws_subnet.public_subnet.id,
+    aws_subnet.public_subnet_2.id
+  ]
 
-  user_data_base64 = base64encode(<<EOF
+  tags = {
+    Name = "genesis-alb"
+  }
+}
+
+resource "aws_lb_target_group" "genesis_tg" {
+  name     = "genesis-tg"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.genesis_vpc.id
+
+  health_check {
+    enabled             = true
+    path                = "/health"
+    port                = "80"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "genesis-target-group"
+  }
+}
+
+resource "aws_lb_listener" "genesis_listener" {
+  load_balancer_arn = aws_lb.genesis_alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.genesis_tg.arn
+  }
+}
+
+resource "aws_launch_template" "genesis_lt" {
+  name_prefix   = "genesis-lt-"
+  image_id      = data.aws_ami.ubuntu.id
+  instance_type = "t3.micro"
+  key_name      = "lusine-server-pem"
+
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
+
+  user_data = base64encode(<<EOF
 #!/bin/bash
 exec > /var/log/user-data.log 2>&1
 set -eux
@@ -253,6 +344,7 @@ cat > .env <<EOT
 DATABASE_URL=postgresql://${var.db_username}:${var.db_password}@${aws_db_instance.genesis_db.endpoint}/genesis_db
 EOT
 
+docker-compose down || true
 docker-compose up -d --build
 
 docker ps -a
@@ -261,13 +353,65 @@ echo "FINISHED USER DATA"
 EOF
   )
 
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = {
+      Name = "genesis-asg-instance"
+    }
+  }
+
   tags = {
-    Name = "genesis-app-server"
+    Name = "genesis-launch-template"
   }
 }
 
-output "ec2_public_ip" {
-  value = aws_instance.genesis_app.public_ip
+resource "aws_autoscaling_group" "genesis_asg" {
+  name             = "genesis-asg"
+  min_size         = 2
+  max_size         = 4
+  desired_capacity = 2
+
+  vpc_zone_identifier = [
+    aws_subnet.public_subnet.id,
+    aws_subnet.public_subnet_2.id
+  ]
+
+  target_group_arns = [
+    aws_lb_target_group.genesis_tg.arn
+  ]
+
+  health_check_type         = "ELB"
+  health_check_grace_period = 180
+
+  launch_template {
+    id      = aws_launch_template.genesis_lt.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "genesis-asg-instance"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_autoscaling_policy" "genesis_cpu_scaling" {
+  name                   = "genesis-cpu-target-tracking"
+  autoscaling_group_name = aws_autoscaling_group.genesis_asg.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+
+    target_value = 50.0
+  }
+}
+
+output "alb_dns_name" {
+  value = aws_lb.genesis_alb.dns_name
 }
 
 output "rds_endpoint" {
