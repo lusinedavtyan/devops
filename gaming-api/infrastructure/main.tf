@@ -23,6 +23,18 @@ module "networking" {
   environment          = "production"
 }
 
+resource "aws_ssm_parameter" "db_username" {
+  name  = "/project-genesis/db-username"
+  type  = "String"
+  value = var.db_username
+}
+
+resource "aws_ssm_parameter" "db_password" {
+  name  = "/project-genesis/db-password"
+  type  = "SecureString"
+  value = var.db_password
+}
+
 module "compute" {
   source = "./modules/compute"
 
