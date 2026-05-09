@@ -58,6 +58,42 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
+resource "aws_iam_role" "ec2_ssm_role" {
+  name = "project-genesis-ec2-ssm-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ec2_ssm_policy" {
+  name = "project-genesis-ssm-policy"
+  role = aws_iam_role.ec2_ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "ssm:GetParameter"
+      ]
+      Resource = "arn:aws:ssm:*:*:parameter/project-genesis/*"
+    }]
+  })
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "project-genesis-ec2-profile"
+  role = aws_iam_role.ec2_ssm_role.name
+}
+
 resource "aws_lb" "genesis_alb" {
   name               = "genesis-alb"
   internal           = false
@@ -114,6 +150,10 @@ resource "aws_launch_template" "genesis_lt" {
 
   vpc_security_group_ids = [aws_security_group.app_sg.id]
 
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
+
   user_data = base64encode(<<EOF
 #!/bin/bash
 exec > /var/log/user-data.log 2>&1
@@ -122,10 +162,23 @@ set -eux
 echo "START USER DATA"
 
 apt-get update -y
-DEBIAN_FRONTEND=noninteractive apt-get install -y git docker.io docker-compose
+DEBIAN_FRONTEND=noninteractive apt-get install -y git docker.io docker-compose awscli
 
 systemctl start docker
 systemctl enable docker
+
+DB_USERNAME=$(aws ssm get-parameter \
+  --name "/project-genesis/db-username" \
+  --query "Parameter.Value" \
+  --output text \
+  --region us-east-1)
+
+DB_PASSWORD=$(aws ssm get-parameter \
+  --name "/project-genesis/db-password" \
+  --with-decryption \
+  --query "Parameter.Value" \
+  --output text \
+  --region us-east-1)
 
 cd /home/ubuntu
 
@@ -135,7 +188,7 @@ git clone https://github.com/lusinedavtyan/devops.git project-genesis
 cd /home/ubuntu/project-genesis/gaming-api
 
 cat > .env <<EOT
-DATABASE_URL=postgresql://${var.db_username}:${var.db_password}@${var.db_endpoint}/genesis_db
+DATABASE_URL=postgresql://$${DB_USERNAME}:$${DB_PASSWORD}@${var.db_endpoint}/genesis_db
 EOT
 
 docker-compose down || true
