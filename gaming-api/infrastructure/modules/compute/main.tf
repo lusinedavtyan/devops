@@ -154,26 +154,22 @@ resource "aws_launch_template" "genesis_lt" {
     name = aws_iam_instance_profile.ec2_profile.name
   }
 
-  user_data = base64encode(<<EOF
+  user_data = base64encode(<<-EOF
 #!/bin/bash
 exec > /var/log/user-data.log 2>&1
 set -eux
 
 echo "START USER DATA"
 
-apt-get update -y
-DEBIAN_FRONTEND=noninteractive apt-get install -y git docker.io docker-compose awscli
-
 systemctl start docker
-systemctl enable docker
 
-DB_USERNAME=$(aws ssm get-parameter \
+DB_USERNAME=$$(aws ssm get-parameter \
   --name "/project-genesis/db-username" \
   --query "Parameter.Value" \
   --output text \
   --region us-east-1)
 
-DB_PASSWORD=$(aws ssm get-parameter \
+DB_PASSWORD=$$(aws ssm get-parameter \
   --name "/project-genesis/db-password" \
   --with-decryption \
   --query "Parameter.Value" \
