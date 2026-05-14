@@ -7,7 +7,8 @@ variable "public_subnet_ids" {
 }
 
 variable "app_ami_id" {
-  type = string
+  description = "AMI ID used by EC2 instances in the ASG"
+  type        = string
 }
 
 variable "db_endpoint" {

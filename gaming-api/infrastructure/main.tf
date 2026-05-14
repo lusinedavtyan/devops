@@ -1,16 +1,6 @@
-data "aws_ami" "ubuntu" {
-  most_recent = true
-  owners      = ["099720109477"]
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
+variable "golden_ami_id" {
+  description = "Golden AMI ID"
+  type        = string
 }
 
 module "networking" {
@@ -40,7 +30,7 @@ module "compute" {
 
   vpc_id            = module.networking.vpc_id
   public_subnet_ids = module.networking.public_subnet_ids
-  app_ami_id        = data.aws_ami.ubuntu.id
+  app_ami_id        = var.golden_ami_id
   db_endpoint       = aws_db_instance.genesis_db.endpoint
   db_username       = var.db_username
   db_password       = var.db_password

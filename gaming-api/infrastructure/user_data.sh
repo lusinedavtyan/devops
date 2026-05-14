@@ -1,22 +1,16 @@
 #!/bin/bash
-
-yum update -y
-
-yum install -y docker aws-cli
-
-systemctl start docker
-systemctl enable docker
+set -e
 
 DB_USERNAME=$(aws ssm get-parameter \
   --name "/project-genesis/db-username" \
-  --query Parameter.Value \
+  --query "Parameter.Value" \
   --output text \
   --region us-east-1)
 
 DB_PASSWORD=$(aws ssm get-parameter \
   --name "/project-genesis/db-password" \
   --with-decryption \
-  --query Parameter.Value \
+  --query "Parameter.Value" \
   --output text \
   --region us-east-1)
 
