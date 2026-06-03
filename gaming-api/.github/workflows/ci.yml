@@ -1,11 +1,11 @@
-name: Genesis CI
+name: Genesis CI/CD
 
 on:
   push:
     branches: [hw30]
 
 jobs:
-  hello-runner:
+  build-and-push:
     runs-on: self-hosted
 
     steps:
@@ -17,3 +17,15 @@ jobs:
           docker --version
           kubectl version --client
           helm version
+
+      - name: Login to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }} .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }}
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
