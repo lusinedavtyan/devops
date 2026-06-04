@@ -1,6 +1,7 @@
 name: Genesis CI/CD
 
 on:
+  workflow_dispatch:
   push:
     branches: [hw30]
 
