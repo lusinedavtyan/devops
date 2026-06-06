@@ -25,12 +25,14 @@ jobs:
       - name: Install dependencies
         run: |
           cd gaming-api
-          pip install -r requirements.txt
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install pytest
 
       - name: Run tests
         run: |
           cd gaming-api
-          pytest -q
+          python3 -m pytest -q
 
   build:
     needs: test
@@ -50,10 +52,20 @@ jobs:
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7} ./gaming-api
+        run: |
+          docker build \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7} \
+            ./gaming-api
 
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7}
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7}
+
+          docker tag \
+            ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7} \
+            ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
+
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
 
   deploy:
     needs: build
@@ -63,10 +75,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Minikube
+      - name: Deploy to Minikube with Helm
         run: |
           helm upgrade --install genesis ./gaming-api/genesis-chart \
             --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/genesis \
             --set image.tag=${{ needs.build.outputs.tag }}
 
-          kubectl rollout status deploy/genesis-deployment
+          kubectl rollout status deployment/genesis-deployment
