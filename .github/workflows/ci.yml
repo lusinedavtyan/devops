@@ -3,82 +3,13 @@ name: Genesis CI/CD
 on:
   workflow_dispatch:
   push:
-    branches: [hw31]
-  pull_request:
-    branches: [main]
+    branches: [hw33]
 
 jobs:
-  test:
-    runs-on: self-hosted
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Verify tools
-        run: |
-          echo "Running tests on self-hosted runner"
-          docker --version
-          kubectl version --client
-          helm version
-          python3 --version
-
-      - name: Install dependencies
-        run: |
-          cd gaming-api
-          python3 -m pip install --upgrade pip
-          python3 -m pip install -r requirements.txt
-          python3 -m pip install pytest
-
-      - name: Run tests
-        run: |
-          cd gaming-api
-          python3 -m pytest -q
-
-  build:
-    needs: test
-    runs-on: self-hosted
-
-    outputs:
-      tag: ${{ steps.meta.outputs.tag }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Login to DockerHub
-        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-
-      - name: Set image tag
-        id: meta
-        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      - name: Build Docker image
-        run: |
-          docker build \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7} \
-            ./gaming-api
-
-      - name: Push Docker image
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7}
-
-          docker tag \
-            ${{ secrets.DOCKERHUB_USERNAME }}/genesis:${GITHUB_SHA::7} \
-            ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
-
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genesis:latest
-
-  deploy:
-    needs: build
-    runs-on: self-hosted
-    environment: staging
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to Minikube with Helm
-        run: |
-          helm upgrade --install genesis ./gaming-api/genesis-chart \
-            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/genesis \
-            --set image.tag=${{ needs.build.outputs.tag }}
-
-          kubectl rollout status deployment/genesis-deployment
+  genesis-pipeline:
+    uses: lusinedavtyan/ci-templates/.github/workflows/genesis-template.yml@main
+    secrets: inherit
+    with:
+      app-name: genesis
+      docker-context: ./gaming-api
+      chart-path: ./gaming-api/genesis-chart
