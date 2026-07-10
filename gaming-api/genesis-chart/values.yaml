@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: nginx
-  tag: "latest"
+  tag: latest
   pullPolicy: IfNotPresent
 
 service:
@@ -14,9 +14,9 @@ ingress:
   host: genesis.local
 
 config:
-  dbHost: "postgres-service"
-  appEnv: "production"
-  logLevel: "info"
+  dbHost: postgres-service
+  appEnv: production
+  logLevel: info
 
 db:
   secretName: genesis-db-creds
