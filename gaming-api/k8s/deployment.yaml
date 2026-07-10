@@ -3,10 +3,10 @@ kind: Deployment
 metadata:
   name: genesis-deployment
 spec:
-  replicas: 3
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      app: genesis
+      app: {{ .Chart.Name }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -15,13 +15,13 @@ spec:
   template:
     metadata:
       labels:
-        app: genesis
+        app: {{ .Chart.Name }}
     spec:
       containers:
         - name: genesis
-          image: nginx:1.26
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
-            - containerPort: 80
+            - containerPort: {{ .Values.service.port }}
 
           envFrom:
             - configMapRef:

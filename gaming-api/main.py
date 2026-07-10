@@ -6,6 +6,7 @@ import requests
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 load_dotenv()
 
@@ -25,6 +26,7 @@ APP_ENV = os.getenv("APP_ENV")
 # create FastAPI application
 app = FastAPI()
 
+Instrumentator().instrument(app).expose(app)
 
 # -----------------------------
 # Database model
