@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: genesis
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/lusinedavtyan/devops.git
+    targetRevision: hw32
+    path: gaming-api/genesis-chart
+
+    helm:
+      values: |
+        replicaCount: 2
+
+        image:
+          repository: lusinedavtyan/genesis
+          tag: latest
+          pullPolicy: IfNotPresent
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: genesis
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+    syncOptions:
+      - CreateNamespace=true
