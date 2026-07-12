@@ -1,0 +1,17 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-servicemonitor
+  labels:
+    release: kps
+spec:
+  selector:
+    matchLabels:
+      app: genesis-api
+
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.metrics.interval }}
+      path: /metrics
+{{- end }}
