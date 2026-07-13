@@ -6,6 +6,7 @@ import requests
 from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 load_dotenv()
 
@@ -25,6 +26,18 @@ APP_ENV = os.getenv("APP_ENV")
 # create FastAPI application
 app = FastAPI()
 
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=False,
+    excluded_handlers=["/metrics"],
+)
+
+instrumentator.instrument(app).expose(
+    app,
+    endpoint="/metrics",
+    include_in_schema=False,
+)
 
 # -----------------------------
 # Database model
@@ -84,13 +97,14 @@ def health():
 @app.get("/deals")
 def get_deals():
     url = "https://www.cheapshark.com/api/1.0/deals"
-    response = requests.get(url)
-
-    if response.status_code != 200:
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+    except requests.RequestException as exc:
         raise HTTPException(
-            status_code=response.status_code,
-            detail="External API request failed"
-        )
+            status_code=502,
+            detail="External API request failed",
+        ) from exc
 
     data = response.json()
     deals = []

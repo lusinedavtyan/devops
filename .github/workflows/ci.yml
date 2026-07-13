@@ -1,0 +1,15 @@
+name: Genesis CI/CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [hw33]
+
+jobs:
+  genesis-pipeline:
+    uses: lusinedavtyan/ci-templates/.github/workflows/genesis-template.yml@main
+    secrets: inherit
+    with:
+      app-name: genesis
+      docker-context: ./gaming-api
+      chart-path: ./gaming-api/genesis-chart

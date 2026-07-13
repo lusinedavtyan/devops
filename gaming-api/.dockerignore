@@ -1,5 +1,10 @@
-.git
-__pycache__
-venv/
-*.pyc
+*.pem
+*.key
+*.crt
 .env
+.git/
+.github/
+k8s/
+genesis-chart/
+__pycache__/
+*.pyc
