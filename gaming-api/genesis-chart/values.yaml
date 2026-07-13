@@ -20,3 +20,8 @@ config:
 
 db:
   secretName: genesis-db-creds
+
+metrics:
+  enabled: true
+  port: 8000
+  interval: 15s

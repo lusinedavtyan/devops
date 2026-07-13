@@ -2,26 +2,36 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-deployment
+  labels:
+    app: genesis
 spec:
-  replicas: 3
+  replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
       app: genesis
+
   strategy:
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 0
+
   template:
     metadata:
       labels:
         app: genesis
+
     spec:
       containers:
         - name: genesis
-          image: nginx:1.26
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: 8000
+              protocol: TCP
 
           envFrom:
             - configMapRef:
@@ -42,10 +52,17 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 5
+              path: /health
+              port: http
+            initialDelaySeconds: 10
             periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
 
           resources:
             requests:

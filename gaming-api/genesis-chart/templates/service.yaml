@@ -7,6 +7,12 @@ spec:
   selector:
     app: genesis
   ports:
-    - port: 80
-      targetPort: 80
-      nodePort: 30080
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+
+    - name: metrics
+      port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
